@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+@layer base {
+    button,
+    input,
+    select,
+    textarea {
+        font: inherit;
+    }
+}
+
+@layer components {
+    .field {
+        @apply mb-4 block text-sm font-medium text-slate-700;
+    }
+
+    .field.compact {
+        @apply mb-0 w-full lg:max-w-64;
+    }
+
+    .field span {
+        @apply mb-1 block;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+        @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-slate-700 focus:ring-2 focus:ring-slate-200;
+    }
+
+    .field small {
+        @apply mt-1 block text-red-600;
+    }
+
+    .primary {
+        @apply rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800;
+    }
+
+    .secondary {
+        @apply rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100;
+    }
+
+    .danger {
+        @apply rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100;
+    }
+
+    .tab {
+        @apply rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100;
+    }
+
+    .tab.active {
+        @apply border-slate-300 bg-slate-100 text-slate-950;
+    }
+
+    .pill {
+        @apply inline-flex shrink-0 items-center rounded px-2 py-1 text-xs font-semibold;
+    }
+
+    .pill.ok,
+    .pill.done {
+        @apply bg-emerald-100 text-emerald-800;
+    }
+
+    .pill.muted,
+    .pill.planned {
+        @apply bg-slate-100 text-slate-700;
+    }
+
+    .pill.in_progress {
+        @apply bg-blue-100 text-blue-800;
+    }
+
+    .pill.blocked {
+        @apply bg-red-100 text-red-800;
+    }
+
+    .task-row {
+        @apply rounded border border-slate-200 px-3 py-2;
+    }
+
+    .task-row.blocked {
+        @apply border-red-200 bg-red-50;
+    }
+}

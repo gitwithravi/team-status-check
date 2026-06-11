@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      APP_NAME: "Team Status"
+      APP_ENV: production
+      APP_KEY: "${APP_KEY}"
+      APP_DEBUG: "false"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      APP_TIMEZONE: "${APP_TIMEZONE:-Asia/Kolkata}"
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /data/database.sqlite
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      ADMIN_NAME: "${ADMIN_NAME:-Admin}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-password}"
+      LOG_CHANNEL: stderr
+    volumes:
+      - team-status-data:/data
+
+volumes:
+  team-status-data:
