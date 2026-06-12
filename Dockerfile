@@ -17,7 +17,8 @@ RUN npm run build
 FROM php:8.4-cli-alpine
 WORKDIR /var/www/html
 
-RUN apk add --no-cache sqlite bash
+RUN apk add --no-cache bash \
+    && docker-php-ext-install pdo_mysql
 
 COPY --from=vendor /app ./
 COPY --from=assets /app/public/build ./public/build

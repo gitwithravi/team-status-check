@@ -1,9 +1,12 @@
 #!/usr/bin/env sh
 set -eu
 
-if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
-    mkdir -p "$(dirname "${DB_DATABASE:-/data/database.sqlite}")"
-    touch "${DB_DATABASE:-/data/database.sqlite}"
+if [ "${DB_CONNECTION:-sqlite}" = "mysql" ]; then
+    echo "Waiting for database connection..."
+    until php -r 'try { new PDO("mysql:host=" . getenv("DB_HOST") . ";port=" . getenv("DB_PORT") . ";dbname=" . getenv("DB_DATABASE"), getenv("DB_USERNAME"), getenv("DB_PASSWORD")); exit(0); } catch (\Exception $e) { exit(1); }'; do
+        sleep 1
+    done
+    echo "Database is ready!"
 fi
 
 if [ -z "${APP_KEY:-}" ]; then
