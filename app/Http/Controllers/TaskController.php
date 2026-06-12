@@ -60,6 +60,7 @@ class TaskController extends Controller
     public function destroy(Request $request, DailyTask $task): JsonResponse
     {
         $this->authorizeTask($request, $task);
+        abort_if($task->team_id !== null, 422, 'Tasks moved from the backlog cannot be deleted. Move them back to the backlog instead.');
 
         $task->delete();
 

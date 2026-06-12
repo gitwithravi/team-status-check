@@ -93,6 +93,7 @@ class BacklogController extends Controller
                 'title' => $backlogTask->title,
                 'notes' => $backlogTask->description,
                 'status' => 'planned',
+                'team_id' => $backlogTask->team_id,
             ]);
 
             $backlogTask->delete();
@@ -103,6 +104,36 @@ class BacklogController extends Controller
         return response()->json([
             'message' => 'Task moved to today.',
             'task' => $task,
+        ]);
+    }
+
+    public function returnToBacklog(Request $request, DailyTask $task): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->isMember(), 403, 'Only team members can return tasks to backlog.');
+        abort_unless($task->user_id === $user->id, 403, 'Unauthorized.');
+        abort_unless($task->team_id !== null, 422, 'This task did not originate from the backlog.');
+        abort_if($task->work_date->toDateString() !== today(config('app.timezone'))->toDateString(), 422, 'Only today\'s tasks can be returned to backlog.');
+
+        $belongsToTeam = $user->teams()->whereKey($task->team_id)->exists();
+        abort_unless($belongsToTeam, 403, 'You are not a member of the team assigned to this task.');
+
+        $backlogTask = DB::transaction(function () use ($task) {
+            $backlog = BacklogTask::create([
+                'team_id' => $task->team_id,
+                'project_name' => $task->project_name,
+                'title' => $task->title,
+                'description' => $task->notes,
+            ]);
+
+            $task->delete();
+
+            return $backlog;
+        });
+
+        return response()->json([
+            'message' => 'Task returned to backlog.',
+            'backlog' => $backlogTask->load('team:id,name'),
         ]);
     }
 

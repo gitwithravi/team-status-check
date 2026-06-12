@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/backlog', [BacklogController::class, 'index']);
     Route::post('/backlog', [BacklogController::class, 'store'])->middleware('role:admin,team-manager');
     Route::post('/backlog/{backlogTask}/move', [BacklogController::class, 'move'])->middleware('role:member');
+    Route::post('/tasks/{task}/backlog', [BacklogController::class, 'returnToBacklog'])->middleware('role:member');
     Route::delete('/backlog/{backlogTask}', [BacklogController::class, 'destroy'])->middleware('role:admin,team-manager');
 
     Route::get('/admin/dashboard', DashboardController::class)->middleware('role:admin');

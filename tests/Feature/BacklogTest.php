@@ -223,4 +223,91 @@ class BacklogTest extends TestCase
         $response->assertForbidden();
         $this->assertDatabaseHas('backlog_tasks', ['id' => $backlog->id]);
     }
+
+    public function test_member_cannot_delete_moved_backlog_task_directly(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        $backlog = BacklogTask::create([
+            'team_id' => $team->id,
+            'project_name' => 'Operations',
+            'title' => 'Setup CI',
+        ]);
+
+        // Move to today
+        $this->actingAs($member)->postJson("/backlog/{$backlog->id}/move")->assertOk();
+
+        $dailyTask = DailyTask::query()->where('user_id', $member->id)->firstOrFail();
+        $this->assertNotNull($dailyTask->team_id);
+
+        // Attempt direct delete -> should be blocked (422)
+        $response = $this->actingAs($member)->deleteJson("/tasks/{$dailyTask->id}");
+        $response->assertStatus(422);
+        $this->assertDatabaseHas('daily_tasks', ['id' => $dailyTask->id]);
+    }
+
+    public function test_member_can_return_daily_task_to_backlog(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        $backlog = BacklogTask::create([
+            'team_id' => $team->id,
+            'project_name' => 'Operations',
+            'title' => 'Setup CI',
+            'description' => 'Optional notes',
+        ]);
+
+        // Move to today
+        $this->actingAs($member)->postJson("/backlog/{$backlog->id}/move")->assertOk();
+        $dailyTask = DailyTask::query()->where('user_id', $member->id)->firstOrFail();
+
+        // Return to backlog
+        $response = $this->actingAs($member)->postJson("/tasks/{$dailyTask->id}/backlog");
+        $response->assertOk()
+            ->assertJsonPath('message', 'Task returned to backlog.');
+
+        // Verify daily task is deleted
+        $this->assertDatabaseMissing('daily_tasks', ['id' => $dailyTask->id]);
+
+        // Verify backlog task is recreated
+        $this->assertDatabaseHas('backlog_tasks', [
+            'team_id' => $team->id,
+            'project_name' => 'Operations',
+            'title' => 'Setup CI',
+            'description' => 'Optional notes',
+        ]);
+    }
+
+    public function test_member_cannot_return_daily_task_to_backlog_if_not_in_team(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member1 = User::factory()->member()->create();
+        $member2 = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        
+        $team->members()->attach($member1); // member1 is in team, member2 is not
+
+        $backlog = BacklogTask::create([
+            'team_id' => $team->id,
+            'project_name' => 'Operations',
+            'title' => 'Setup CI',
+        ]);
+
+        // Move to today (done by member1)
+        $this->actingAs($member1)->postJson("/backlog/{$backlog->id}/move")->assertOk();
+        $dailyTask = DailyTask::query()->where('user_id', $member1->id)->firstOrFail();
+
+        // Attempt return to backlog by member2 -> should be forbidden (403)
+        $response = $this->actingAs($member2)->postJson("/tasks/{$dailyTask->id}/backlog");
+        $response->assertForbidden();
+
+        $this->assertDatabaseHas('daily_tasks', ['id' => $dailyTask->id]);
+        $this->assertDatabaseMissing('backlog_tasks', ['project_name' => 'Operations']);
+    }
 }

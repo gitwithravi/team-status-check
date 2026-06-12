@@ -347,6 +347,17 @@ async function moveBacklogToToday(backlog) {
     await loadTasks();
 }
 
+async function moveTaskToBacklog(task) {
+    if (confirm('Are you sure you want to move this task back to the backlog?')) {
+        await request(`/tasks/${task.id}/backlog`, { method: 'POST' });
+        message.value = 'Task returned to backlog.';
+        await loadTasks();
+        if (view.value === 'backlog') {
+            await loadBacklog();
+        }
+    }
+}
+
 function firstError(field) {
     return errors.value[field]?.[0] || '';
 }
@@ -764,8 +775,11 @@ onMounted(loadSession);
                                 <span :class="['pill', task.status]">{{ statusLabel(task.status) }}</span>
                             </div>
                             <div class="mt-4 flex gap-2">
-                                <button class="secondary" @click="editTask(task)">Edit</button>
-                                <button class="danger" @click="deleteTask(task)">Delete</button>
+                                <button class="secondary cursor-pointer" @click="editTask(task)">Edit</button>
+                                <button v-if="task.team_id !== null" class="secondary cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-50" @click="moveTaskToBacklog(task)">
+                                    Move to Backlog
+                                </button>
+                                <button v-else class="danger cursor-pointer" @click="deleteTask(task)">Delete</button>
                             </div>
                         </article>
                         <p v-if="!tasks.length" class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">No tasks added for today.</p>
