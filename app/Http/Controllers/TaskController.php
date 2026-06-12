@@ -20,6 +20,22 @@ class TaskController extends Controller
         ]);
     }
 
+    public function history(Request $request): JsonResponse
+    {
+        $filters = $request->validate([
+            'date' => ['nullable', 'date'],
+        ]);
+
+        return response()->json([
+            'tasks' => $request->user()->dailyTasks()
+                ->when($filters['date'] ?? null, fn ($query, $date) => $query->whereDate('work_date', $date))
+                ->orderByDesc('work_date')
+                ->latest()
+                ->get(),
+            'today' => $this->today(),
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $data = $this->validateTask($request);

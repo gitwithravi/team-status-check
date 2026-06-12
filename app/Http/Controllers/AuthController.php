@@ -37,6 +37,22 @@ class AuthController extends Controller
         return $this->user($request);
     }
 
+    public function updatePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'current_password'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $request->user()->update([
+            'password' => $data['password'],
+        ]);
+
+        $request->session()->regenerate();
+
+        return response()->json(['message' => 'Password updated.']);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         Auth::guard('web')->logout();

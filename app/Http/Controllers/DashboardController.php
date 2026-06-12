@@ -21,7 +21,7 @@ class DashboardController extends Controller
         $date = $filters['date'] ?? today(config('app.timezone'))->toDateString();
 
         $members = User::query()
-            ->where('role', 'member')
+            ->where('role', User::ROLE_MEMBER)
             ->when($filters['member_id'] ?? null, fn ($query, $id) => $query->whereKey($id))
             ->with(['dailyTasks' => fn ($query) => $query
                 ->whereDate('work_date', $date)
