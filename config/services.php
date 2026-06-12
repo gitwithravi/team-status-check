@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'third_party_api' => [
+        'key' => env('THIRD_PARTY_API_KEY'),
+    ],
+
 ];

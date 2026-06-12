@@ -404,4 +404,72 @@ class TeamStatusTest extends TestCase
             ->assertJsonPath('teams.0.members.0.counts.blocked', 1)
             ->assertJsonPath('teams.0.members.0.counts.done', 0);
     }
+
+    public function test_external_api_requires_shared_key(): void
+    {
+        config(['services.third_party_api.key' => 'shared-secret']);
+
+        $this->getJson('/api/team-members')
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Invalid API key.');
+
+        $this->getJson('/api/team-members', ['X-API-Key' => 'wrong-secret'])
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Invalid API key.');
+    }
+
+    public function test_external_api_lists_active_team_members(): void
+    {
+        config(['services.third_party_api.key' => 'shared-secret']);
+
+        $active = User::factory()->member()->create(['name' => 'Active Member', 'active' => true]);
+        User::factory()->member()->create(['name' => 'Inactive Member', 'active' => false]);
+        User::factory()->teamManager()->create(['name' => 'Team Manager', 'active' => true]);
+
+        $this->getJson('/api/team-members', ['X-API-Key' => 'shared-secret'])
+            ->assertOk()
+            ->assertJsonCount(1, 'members')
+            ->assertJsonPath('members.0.id', $active->id)
+            ->assertJsonPath('members.0.name', 'Active Member');
+    }
+
+    public function test_external_api_lists_tasks_by_member_and_date(): void
+    {
+        config(['services.third_party_api.key' => 'shared-secret']);
+
+        $member = User::factory()->member()->create(['active' => true]);
+        $other = User::factory()->member()->create(['active' => true]);
+
+        DailyTask::query()->create([
+            'user_id' => $member->id,
+            'work_date' => '2026-06-11',
+            'project_name' => 'Operations',
+            'title' => 'Visible task',
+            'status' => 'done',
+        ]);
+
+        DailyTask::query()->create([
+            'user_id' => $member->id,
+            'work_date' => '2026-06-12',
+            'project_name' => 'Operations',
+            'title' => 'Wrong date task',
+            'status' => 'planned',
+        ]);
+
+        DailyTask::query()->create([
+            'user_id' => $other->id,
+            'work_date' => '2026-06-11',
+            'project_name' => 'Support',
+            'title' => 'Other member task',
+            'status' => 'blocked',
+        ]);
+
+        $this->getJson("/api/tasks?member_id={$member->id}&date=2026-06-11", ['X-API-Key' => 'shared-secret'])
+            ->assertOk()
+            ->assertJsonPath('member.id', $member->id)
+            ->assertJsonPath('date', '2026-06-11')
+            ->assertJsonCount(1, 'tasks')
+            ->assertJsonPath('tasks.0.project_name', 'Operations')
+            ->assertJsonPath('tasks.0.title', 'Visible task');
+    }
 }
