@@ -13,6 +13,13 @@ class TeamStatusTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_unauthenticated_json_requests_return_unauthorized(): void
+    {
+        $this->getJson('/session')
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Unauthenticated.');
+    }
+
     public function test_admin_can_create_a_team_member(): void
     {
         $admin = User::factory()->admin()->create();
