@@ -36,8 +36,6 @@ services:
       MYSQL_USER: "${DB_USERNAME:-team_status_user}"
       MYSQL_PASSWORD: "${DB_PASSWORD:-team_status_password}"
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root_password_here}"
-    ports:
-      - "3306:3306"
     volumes:
       - db-data:/var/lib/mysql
     healthcheck:
