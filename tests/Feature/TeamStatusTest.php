@@ -73,17 +73,24 @@ class TeamStatusTest extends TestCase
         ])->assertOk()->assertJsonPath('user.id', $member->id);
 
         $this->postJson('/tasks', [
+            'project_name' => 'Operations',
             'title' => 'Prepare deployment',
             'status' => 'planned',
-        ])->assertCreated();
+        ])->assertCreated()
+            ->assertJsonPath('task.project_name', 'Operations');
 
         $this->postJson('/tasks', [
+            'project_name' => 'Support',
             'title' => 'Review blockers',
             'status' => 'blocked',
             'notes' => 'Waiting for credentials.',
         ])->assertCreated();
 
         $this->assertDatabaseCount('daily_tasks', 2);
+        $this->assertDatabaseHas('daily_tasks', [
+            'project_name' => 'Operations',
+            'title' => 'Prepare deployment',
+        ]);
     }
 
     public function test_inactive_member_cannot_login(): void

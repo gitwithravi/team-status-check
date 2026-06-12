@@ -12,6 +12,7 @@ class DailyTask extends Model
     protected $fillable = [
         'user_id',
         'work_date',
+        'project_name',
         'title',
         'notes',
         'status',

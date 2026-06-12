@@ -1,0 +1,9 @@
+sheet,row,reason,raw_date,course_name,task,status
+Naveen,35,missing_task,31/3/2026,generative ai,,
+Naveen,76,invalid_date:unparsed,22/05/269,generative ai,"module 6 sess 3,5",Complete
+Sathish,70,missing_task,46136.0,Leave,,
+Rajdeep,46,missing_task,21/04/26,Placement,,Inprogress
+Rajdeep,60,missing_task,46208.0,Recording,,Inprogress
+Rajdeep,68,missing_task,19/05/26,Placement Testimonial video,,Inprogress
+Rajdeep,85,missing_task,46240.0,Placement Testimonial video,,
+Rajdeep,90,missing_task,46362.0,Placement Testimonial video,,Inprogress

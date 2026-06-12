@@ -69,6 +69,7 @@ class TaskController extends Controller
     private function validateTask(Request $request): array
     {
         return $request->validate([
+            'project_name' => ['required', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(DailyTask::STATUSES)],

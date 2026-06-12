@@ -12,7 +12,7 @@ const view = ref('dashboard');
 const loginForm = reactive({ email: '', password: '', remember: false });
 const memberForm = reactive({ id: null, name: '', email: '', password: '', role: 'member', active: true });
 const teamForm = reactive({ id: null, name: '', manager_id: '', member_ids: [] });
-const taskForm = reactive({ id: null, title: '', notes: '', status: 'planned' });
+const taskForm = reactive({ id: null, project_name: '', title: '', notes: '', status: 'planned' });
 const passwordForm = reactive({ current_password: '', password: '', password_confirmation: '' });
 const filters = reactive({ date: '', member_id: '', status: '' });
 const managerFilters = reactive({ date: '', status: '' });
@@ -264,6 +264,7 @@ async function saveTask() {
 
 function editTask(task) {
     taskForm.id = task.id;
+    taskForm.project_name = task.project_name || '';
     taskForm.title = task.title;
     taskForm.notes = task.notes || '';
     taskForm.status = task.status;
@@ -286,6 +287,7 @@ async function updatePassword() {
 
 function resetTaskForm() {
     taskForm.id = null;
+    taskForm.project_name = '';
     taskForm.title = '';
     taskForm.notes = '';
     taskForm.status = 'planned';
@@ -414,7 +416,10 @@ onMounted(loadSession);
                             <div v-if="member.tasks.length" class="space-y-2">
                                 <div v-for="task in member.tasks" :key="task.id" :class="['task-row', task.status === 'blocked' && 'blocked']">
                                     <div class="flex items-start justify-between gap-3">
-                                        <strong>{{ task.title }}</strong>
+                                        <div>
+                                            <p v-if="task.project_name" class="text-xs font-semibold uppercase text-slate-500">{{ task.project_name }}</p>
+                                            <strong>{{ task.title }}</strong>
+                                        </div>
                                         <span :class="['pill', task.status]">{{ statusLabel(task.status) }}</span>
                                     </div>
                                     <p v-if="task.notes" class="mt-1 text-sm text-slate-600">{{ task.notes }}</p>
@@ -466,7 +471,10 @@ onMounted(loadSession);
                                 <div v-if="member.tasks.length" class="space-y-2">
                                     <div v-for="task in member.tasks" :key="task.id" :class="['task-row', task.status === 'blocked' && 'blocked']">
                                         <div class="flex items-start justify-between gap-3">
-                                            <strong>{{ task.title }}</strong>
+                                            <div>
+                                                <p v-if="task.project_name" class="text-xs font-semibold uppercase text-slate-500">{{ task.project_name }}</p>
+                                                <strong>{{ task.title }}</strong>
+                                            </div>
                                             <span :class="['pill', task.status]">{{ statusLabel(task.status) }}</span>
                                         </div>
                                         <p v-if="task.notes" class="mt-1 text-sm text-slate-600">{{ task.notes }}</p>
@@ -602,6 +610,11 @@ onMounted(loadSession);
                         <h2 class="font-semibold">{{ taskForm.id ? 'Edit today task' : 'Add today task' }}</h2>
                         <p class="mb-4 text-sm text-slate-600">{{ today }}</p>
                         <label class="field">
+                            <span>Project Name</span>
+                            <input v-model="taskForm.project_name" required maxlength="255">
+                            <small v-if="firstError('project_name')">{{ firstError('project_name') }}</small>
+                        </label>
+                        <label class="field">
                             <span>Task</span>
                             <input v-model="taskForm.title" required maxlength="255">
                             <small v-if="firstError('title')">{{ firstError('title') }}</small>
@@ -628,6 +641,7 @@ onMounted(loadSession);
                         <article v-for="task in tasks" :key="task.id" :class="['rounded-lg border bg-white p-4 shadow-sm', task.status === 'blocked' ? 'border-red-200' : 'border-slate-200']">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
+                                    <p v-if="task.project_name" class="text-xs font-semibold uppercase text-slate-500">{{ task.project_name }}</p>
                                     <h3 class="font-semibold">{{ task.title }}</h3>
                                     <p v-if="task.notes" class="mt-1 text-sm text-slate-600">{{ task.notes }}</p>
                                 </div>
@@ -661,6 +675,7 @@ onMounted(loadSession);
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase text-slate-500">{{ task.work_date }}</p>
+                                <p v-if="task.project_name" class="mt-1 text-xs font-semibold uppercase text-slate-500">{{ task.project_name }}</p>
                                 <h3 class="mt-1 font-semibold">{{ task.title }}</h3>
                                 <p v-if="task.notes" class="mt-1 text-sm text-slate-600">{{ task.notes }}</p>
                             </div>
