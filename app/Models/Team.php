@@ -22,4 +22,9 @@ class Team extends Model
     {
         return $this->belongsToMany(User::class)->withTimestamps();
     }
+
+    public function backlogTasks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BacklogTask::class);
+    }
 }

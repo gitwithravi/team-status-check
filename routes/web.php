@@ -7,6 +7,7 @@ use App\Http\Controllers\MemberController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\BacklogController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'app')->name('home');
@@ -23,6 +24,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks', [TaskController::class, 'store'])->middleware('role:member');
     Route::put('/tasks/{task}', [TaskController::class, 'update'])->middleware('role:member');
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->middleware('role:member');
+
+    Route::get('/backlog', [BacklogController::class, 'index']);
+    Route::post('/backlog', [BacklogController::class, 'store'])->middleware('role:admin,team-manager');
+    Route::post('/backlog/{backlogTask}/move', [BacklogController::class, 'move'])->middleware('role:member');
+    Route::delete('/backlog/{backlogTask}', [BacklogController::class, 'destroy'])->middleware('role:admin,team-manager');
 
     Route::get('/admin/dashboard', DashboardController::class)->middleware('role:admin');
     Route::get('/admin/members', [MemberController::class, 'index'])->middleware('role:admin');
