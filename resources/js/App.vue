@@ -313,6 +313,72 @@ function roleLabel(role) {
     return 'Member';
 }
 
+const reportFilters = reactive({
+    start_date: '',
+    end_date: '',
+    team_id: '',
+    member_id: '',
+});
+const reportData = ref(null);
+const reportMetadata = ref({ teams: [], members: [] });
+const reportLoading = ref(false);
+
+async function loadReportMetadata() {
+    const data = await request('/reports/filters');
+    reportMetadata.value = {
+        teams: data.teams || [],
+        members: data.members || [],
+    };
+}
+
+async function previewReport() {
+    const params = new URLSearchParams();
+    if (reportFilters.start_date) params.set('start_date', reportFilters.start_date);
+    if (reportFilters.end_date) params.set('end_date', reportFilters.end_date);
+    if (reportFilters.team_id) params.set('team_id', reportFilters.team_id);
+    if (reportFilters.member_id) params.set('member_id', reportFilters.member_id);
+
+    reportLoading.value = true;
+    try {
+        const data = await request(`/reports/preview?${params.toString()}`);
+        reportData.value = data;
+    } catch (e) {
+        console.error(e);
+    } finally {
+        reportLoading.value = false;
+    }
+}
+
+function exportReport() {
+    const params = new URLSearchParams();
+    if (reportFilters.start_date) params.set('start_date', reportFilters.start_date);
+    if (reportFilters.end_date) params.set('end_date', reportFilters.end_date);
+    if (reportFilters.team_id) params.set('team_id', reportFilters.team_id);
+    if (reportFilters.member_id) params.set('member_id', reportFilters.member_id);
+
+    window.location.href = `/reports/export?${params.toString()}`;
+}
+
+async function showReportsView() {
+    view.value = 'reports';
+    if (!reportFilters.start_date || !reportFilters.end_date) {
+        const todayStr = today.value || new Date().toISOString().split('T')[0];
+        const d = new Date(todayStr);
+        d.setDate(1);
+        reportFilters.start_date = d.toISOString().split('T')[0];
+        reportFilters.end_date = todayStr;
+    }
+    reportLoading.value = true;
+    try {
+        await loadReportMetadata();
+        await previewReport();
+    } catch (e) {
+        console.error(e);
+    } finally {
+        reportLoading.value = false;
+    }
+}
+
 onMounted(loadSession);
 </script>
 
@@ -365,6 +431,7 @@ onMounted(loadSession);
                         <button v-if="isTeamManager" :class="['tab', view === 'manager-dashboard' && 'active']" @click="view = 'manager-dashboard'; loadManagerDashboard()">Team Status</button>
                         <button v-if="isMember" :class="['tab', view === 'tasks' && 'active']" @click="view = 'tasks'; loadTasks()">Today</button>
                         <button v-if="isMember" :class="['tab', view === 'history' && 'active']" @click="view = 'history'; loadTaskHistory()">History</button>
+                        <button v-if="isAdmin || isTeamManager" :class="['tab', view === 'reports' && 'active']" @click="showReportsView()">Reports</button>
                         <button :class="['tab', view === 'account' && 'active']" @click="view = 'account'">Account</button>
                         <button class="secondary" @click="logout">Logout</button>
                     </div>
@@ -683,6 +750,113 @@ onMounted(loadSession);
                         </div>
                     </article>
                     <p v-if="!taskHistory.length" class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">No work history yet.</p>
+                </section>
+
+                <section v-if="(isAdmin || isTeamManager) && view === 'reports'" class="space-y-6">
+                    <div class="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end">
+                        <label class="field compact">
+                            <span>Start Date</span>
+                            <input v-model="reportFilters.start_date" type="date" required @change="previewReport">
+                        </label>
+                        <label class="field compact">
+                            <span>End Date</span>
+                            <input v-model="reportFilters.end_date" type="date" required @change="previewReport">
+                        </label>
+                        <label v-if="isAdmin" class="field compact">
+                            <span>Team</span>
+                            <select v-model="reportFilters.team_id" @change="previewReport">
+                                <option value="">All teams</option>
+                                <option v-for="team in reportMetadata.teams" :key="team.id" :value="team.id">{{ team.name }}</option>
+                            </select>
+                        </label>
+                        <label class="field compact">
+                            <span>Team Member</span>
+                            <select v-model="reportFilters.member_id" @change="previewReport">
+                                <option value="">All members</option>
+                                <option v-for="member in reportMetadata.members" :key="member.id" :value="member.id">{{ member.name }}</option>
+                            </select>
+                        </label>
+                        <div class="flex gap-2">
+                            <button class="primary" :disabled="reportLoading" @click="exportReport">
+                                Export PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="reportLoading" class="text-sm text-slate-500 py-4">Loading preview...</div>
+
+                    <div v-else-if="reportData" class="space-y-6">
+                        <!-- Summary Cards -->
+                        <div class="grid gap-4 grid-cols-2 md:grid-cols-5">
+                            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm text-center">
+                                <div class="text-2xl font-bold text-slate-900">{{ reportData.total_tasks }}</div>
+                                <div class="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">Total Tasks</div>
+                            </div>
+                            <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm text-center">
+                                <div class="text-2xl font-bold text-emerald-950">{{ reportData.status_counts?.done || 0 }}</div>
+                                <div class="text-xs text-emerald-700 uppercase tracking-wider font-semibold mt-1">Done</div>
+                            </div>
+                            <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm text-center">
+                                <div class="text-2xl font-bold text-blue-950">{{ reportData.status_counts?.in_progress || 0 }}</div>
+                                <div class="text-xs text-blue-700 uppercase tracking-wider font-semibold mt-1">In Progress</div>
+                            </div>
+                            <div class="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm text-center">
+                                <div class="text-2xl font-bold text-red-950">{{ reportData.status_counts?.blocked || 0 }}</div>
+                                <div class="text-xs text-red-700 uppercase tracking-wider font-semibold mt-1">Blocked</div>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-slate-100 p-4 shadow-sm text-center">
+                                <div class="text-2xl font-bold text-slate-800">{{ reportData.status_counts?.planned || 0 }}</div>
+                                <div class="text-xs text-slate-600 uppercase tracking-wider font-semibold mt-1">Planned</div>
+                            </div>
+                        </div>
+
+                        <!-- Members Tasks List -->
+                        <div class="space-y-4">
+                            <div v-for="member in reportData.members" :key="member.email" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                                <div class="mb-4 flex flex-col justify-between gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-slate-900">{{ member.name }}</h3>
+                                        <p class="text-sm text-slate-500">{{ member.email }}</p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 text-xs">
+                                        <span class="rounded bg-emerald-100 px-2 py-1 text-emerald-800">Done: {{ member.counts?.done || 0 }}</span>
+                                        <span class="rounded bg-blue-100 px-2 py-1 text-blue-800">In Progress: {{ member.counts?.in_progress || 0 }}</span>
+                                        <span class="rounded bg-red-100 px-2 py-1 text-red-800">Blocked: {{ member.counts?.blocked || 0 }}</span>
+                                        <span class="rounded bg-slate-100 px-2 py-1 text-slate-800">Planned: {{ member.counts?.planned || 0 }}</span>
+                                    </div>
+                                </div>
+
+                                <div v-if="member.tasks.length" class="overflow-x-auto">
+                                    <table class="w-full text-left text-sm">
+                                        <thead class="bg-slate-50 text-xs uppercase text-slate-600">
+                                            <tr>
+                                                <th class="px-4 py-2" style="width: 15%;">Date</th>
+                                                <th class="px-4 py-2" style="width: 20%;">Project</th>
+                                                <th class="px-4 py-2" style="width: 50%;">Task Details</th>
+                                                <th class="px-4 py-2 text-center" style="width: 15%;">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="task in member.tasks" :key="task.id" class="border-t border-slate-100">
+                                                <td class="px-4 py-3 font-medium text-slate-600">{{ task.work_date }}</td>
+                                                <td class="px-4 py-3 font-semibold text-slate-700">{{ task.project_name || 'General' }}</td>
+                                                <td class="px-4 py-3">
+                                                    <div class="font-medium text-slate-900">{{ task.title }}</div>
+                                                    <div v-if="task.notes" class="mt-1 text-xs text-slate-500 whitespace-pre-line">{{ task.notes }}</div>
+                                                </td>
+                                                <td class="px-4 py-3 text-center">
+                                                    <span :class="['pill', task.status]">{{ statusLabel(task.status) }}</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p v-else class="rounded border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">No tasks logged during the selected period.</p>
+                            </div>
+
+                            <p v-if="!reportData.members.length" class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">No members match the filtered criteria.</p>
+                        </div>
+                    </div>
                 </section>
 
                 <section v-if="view === 'account'" class="max-w-md">

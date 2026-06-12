@@ -472,4 +472,109 @@ class TeamStatusTest extends TestCase
             ->assertJsonPath('tasks.0.project_name', 'Operations')
             ->assertJsonPath('tasks.0.title', 'Visible task');
     }
+
+    public function test_member_cannot_access_report_endpoints(): void
+    {
+        $member = User::factory()->member()->create();
+
+        $this->actingAs($member)->getJson('/reports/filters')->assertForbidden();
+        $this->actingAs($member)->getJson('/reports/preview?start_date=2026-06-01&end_date=2026-06-10')->assertForbidden();
+        $this->actingAs($member)->getJson('/reports/export?start_date=2026-06-01&end_date=2026-06-10')->assertForbidden();
+    }
+
+    public function test_admin_can_access_report_filters_and_preview(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create(['name' => 'Active Member']);
+        $team = Team::query()->create(['name' => 'Test Team', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        DailyTask::query()->create([
+            'user_id' => $member->id,
+            'work_date' => '2026-06-05',
+            'project_name' => 'Dev',
+            'title' => 'Report task',
+            'status' => 'done',
+        ]);
+
+        // Test filters endpoint
+        $this->actingAs($admin)->getJson('/reports/filters')
+            ->assertOk()
+            ->assertJsonCount(1, 'teams')
+            ->assertJsonCount(1, 'members');
+
+        // Test preview endpoint
+        $this->actingAs($admin)->getJson('/reports/preview?start_date=2026-06-01&end_date=2026-06-10')
+            ->assertOk()
+            ->assertJsonPath('total_tasks', 1)
+            ->assertJsonPath('members.0.name', 'Active Member')
+            ->assertJsonCount(1, 'members.0.tasks');
+    }
+
+    public function test_team_manager_can_only_access_their_managed_teams_in_filters_and_preview(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $otherManager = User::factory()->teamManager()->create();
+
+        $myMember = User::factory()->member()->create(['name' => 'My Member']);
+        $otherMember = User::factory()->member()->create(['name' => 'Other Member']);
+
+        $myTeam = Team::query()->create(['name' => 'My Team', 'manager_id' => $manager->id]);
+        $myTeam->members()->attach($myMember);
+
+        $otherTeam = Team::query()->create(['name' => 'Other Team', 'manager_id' => $otherManager->id]);
+        $otherTeam->members()->attach($otherMember);
+
+        // Test filters
+        $this->actingAs($manager)->getJson('/reports/filters')
+            ->assertOk()
+            ->assertJsonCount(1, 'teams')
+            ->assertJsonPath('teams.0.name', 'My Team')
+            ->assertJsonCount(1, 'members')
+            ->assertJsonPath('members.0.name', 'My Member');
+
+        // Test preview scope
+        DailyTask::query()->create([
+            'user_id' => $myMember->id,
+            'work_date' => '2026-06-05',
+            'project_name' => 'My Project',
+            'title' => 'My Task',
+            'status' => 'done',
+        ]);
+        DailyTask::query()->create([
+            'user_id' => $otherMember->id,
+            'work_date' => '2026-06-05',
+            'project_name' => 'Other Project',
+            'title' => 'Other Task',
+            'status' => 'done',
+        ]);
+
+        $this->actingAs($manager)->getJson('/reports/preview?start_date=2026-06-01&end_date=2026-06-10')
+            ->assertOk()
+            ->assertJsonPath('total_tasks', 1)
+            ->assertJsonCount(1, 'members')
+            ->assertJsonPath('members.0.name', 'My Member');
+    }
+
+    public function test_admin_and_manager_can_export_report_pdf(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->member()->create();
+
+        DailyTask::query()->create([
+            'user_id' => $member->id,
+            'work_date' => '2026-06-05',
+            'project_name' => 'Dev',
+            'title' => 'Report task',
+            'status' => 'done',
+        ]);
+
+        $response = $this->actingAs($admin)->get('/reports/export?start_date=2026-06-01&end_date=2026-06-10');
+        
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="work-report-2026-06-01-to-2026-06-10.pdf"');
+    }
 }
+

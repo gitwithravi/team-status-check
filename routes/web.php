@@ -6,6 +6,7 @@ use App\Http\Controllers\ManagerDashboardController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'app')->name('home');
@@ -32,6 +33,11 @@ Route::middleware('auth')->group(function () {
     Route::put('/admin/teams/{team}', [TeamController::class, 'update'])->middleware('role:admin');
 
     Route::get('/manager/dashboard', ManagerDashboardController::class)->middleware('role:team-manager');
+
+    Route::get('/reports/filters', [ReportController::class, 'filters'])->middleware('role:admin,team-manager');
+    Route::get('/reports/preview', [ReportController::class, 'preview'])->middleware('role:admin,team-manager');
+    Route::get('/reports/export', [ReportController::class, 'export'])->middleware('role:admin,team-manager');
 });
 
 Route::view('/{any}', 'app')->where('any', '.*');
+
