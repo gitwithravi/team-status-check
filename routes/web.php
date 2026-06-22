@@ -26,6 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->middleware('role:member');
 
     Route::get('/backlog', [BacklogController::class, 'index']);
+    Route::get('/my-backlog', [BacklogController::class, 'myBacklog'])->middleware('role:member');
     Route::post('/backlog', [BacklogController::class, 'store'])->middleware('role:admin,team-manager');
     Route::post('/backlog/{backlogTask}/move', [BacklogController::class, 'move'])->middleware('role:member');
     Route::post('/tasks/{task}/backlog', [BacklogController::class, 'returnToBacklog'])->middleware('role:member');
@@ -47,4 +48,3 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::view('/{any}', 'app')->where('any', '.*');
-

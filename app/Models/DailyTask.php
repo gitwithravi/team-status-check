@@ -17,6 +17,7 @@ class DailyTask extends Model
         'notes',
         'status',
         'team_id',
+        'backlog_assigned_user_id',
     ];
 
     protected function casts(): array
@@ -34,5 +35,10 @@ class DailyTask extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function backlogAssignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'backlog_assigned_user_id');
     }
 }
