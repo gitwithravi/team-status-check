@@ -71,6 +71,27 @@ class BacklogTest extends TestCase
             ->assertJsonCount(0, 'teams'); // Members don't get the teams list (it's for dropdowns in creation)
     }
 
+    public function test_assigned_backlog_tasks_do_not_show_in_shared_backlog(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        BacklogTask::create(['team_id' => $team->id, 'project_name' => 'Proj1', 'title' => 'Shared task']);
+        BacklogTask::create([
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+            'project_name' => 'Proj1',
+            'title' => 'Assigned task',
+        ]);
+
+        $this->actingAs($member)->getJson('/backlog')
+            ->assertOk()
+            ->assertJsonCount(1, 'backlogs')
+            ->assertJsonPath('backlogs.0.title', 'Shared task');
+    }
+
     public function test_admin_and_manager_can_create_backlog_tasks(): void
     {
         $admin = User::factory()->admin()->create();
@@ -106,6 +127,47 @@ class BacklogTest extends TestCase
             'title' => 'Title Manager',
             'team_id' => $team->id,
         ]);
+    }
+
+    public function test_admin_can_create_assigned_backlog_task_for_team_member(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        $response = $this->actingAs($admin)->postJson('/backlog', [
+            'project_name' => 'Proj Admin',
+            'title' => 'Assigned Title',
+            'description' => 'Assigned Desc',
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('backlog.assigned_user.id', $member->id);
+
+        $this->assertDatabaseHas('backlog_tasks', [
+            'title' => 'Assigned Title',
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+        ]);
+    }
+
+    public function test_cannot_assign_backlog_task_to_member_outside_team(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+
+        $this->actingAs($admin)->postJson('/backlog', [
+            'project_name' => 'Proj Admin',
+            'title' => 'Assigned Title',
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+        ])->assertStatus(422);
     }
 
     public function test_manager_cannot_create_backlog_task_for_unmanaged_team(): void
@@ -170,6 +232,79 @@ class BacklogTest extends TestCase
         $this->assertDatabaseMissing('backlog_tasks', [
             'id' => $backlog->id,
         ]);
+    }
+
+    public function test_assigned_member_can_view_their_personal_backlog(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $otherMember = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach([$member->id, $otherMember->id]);
+
+        BacklogTask::create([
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+            'project_name' => 'Operations',
+            'title' => 'My task',
+        ]);
+
+        BacklogTask::create([
+            'team_id' => $team->id,
+            'assigned_user_id' => $otherMember->id,
+            'project_name' => 'Operations',
+            'title' => 'Other task',
+        ]);
+
+        $this->actingAs($member)->getJson('/my-backlog')
+            ->assertOk()
+            ->assertJsonCount(1, 'backlogs')
+            ->assertJsonPath('backlogs.0.title', 'My task');
+    }
+
+    public function test_member_can_move_task_assigned_to_them(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        $backlog = BacklogTask::create([
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+            'project_name' => 'Operations',
+            'title' => 'Assigned task',
+        ]);
+
+        $this->actingAs($member)->postJson("/backlog/{$backlog->id}/move")
+            ->assertOk();
+
+        $this->assertDatabaseHas('daily_tasks', [
+            'user_id' => $member->id,
+            'title' => 'Assigned task',
+            'backlog_assigned_user_id' => $member->id,
+        ]);
+    }
+
+    public function test_member_cannot_move_task_assigned_to_another_member(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member1 = User::factory()->member()->create();
+        $member2 = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach([$member1->id, $member2->id]);
+
+        $backlog = BacklogTask::create([
+            'team_id' => $team->id,
+            'assigned_user_id' => $member1->id,
+            'project_name' => 'Operations',
+            'title' => 'Assigned task',
+        ]);
+
+        $this->actingAs($member2)->postJson("/backlog/{$backlog->id}/move")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('backlog_tasks', ['id' => $backlog->id]);
     }
 
     public function test_member_cannot_move_backlog_task_if_not_in_team(): void
@@ -282,6 +417,41 @@ class BacklogTest extends TestCase
             'title' => 'Setup CI',
             'description' => 'Optional notes',
         ]);
+    }
+
+    public function test_return_to_backlog_preserves_assignment(): void
+    {
+        $manager = User::factory()->teamManager()->create();
+        $member = User::factory()->member()->create();
+        $team = Team::query()->create(['name' => 'Team One', 'manager_id' => $manager->id]);
+        $team->members()->attach($member);
+
+        $backlog = BacklogTask::create([
+            'team_id' => $team->id,
+            'assigned_user_id' => $member->id,
+            'project_name' => 'Operations',
+            'title' => 'Assigned task',
+        ]);
+
+        $this->actingAs($member)->postJson("/backlog/{$backlog->id}/move")->assertOk();
+        $dailyTask = DailyTask::query()->where('user_id', $member->id)->firstOrFail();
+
+        $this->actingAs($member)->postJson("/tasks/{$dailyTask->id}/backlog")
+            ->assertOk();
+
+        $this->assertDatabaseHas('backlog_tasks', [
+            'team_id' => $team->id,
+            'title' => 'Assigned task',
+            'assigned_user_id' => $member->id,
+        ]);
+
+        $this->actingAs($member)->getJson('/backlog')
+            ->assertOk()
+            ->assertJsonMissing(['title' => 'Assigned task']);
+
+        $this->actingAs($member)->getJson('/my-backlog')
+            ->assertOk()
+            ->assertJsonPath('backlogs.0.title', 'Assigned task');
     }
 
     public function test_member_cannot_return_daily_task_to_backlog_if_not_in_team(): void

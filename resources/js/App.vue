@@ -14,7 +14,7 @@ const memberForm = reactive({ id: null, name: '', email: '', password: '', role:
 const teamForm = reactive({ id: null, name: '', manager_id: '', member_ids: [] });
 const taskForm = reactive({ id: null, project_name: '', title: '', notes: '', status: 'planned' });
 const passwordForm = reactive({ current_password: '', password: '', password_confirmation: '' });
-const backlogForm = reactive({ project_name: '', title: '', description: '', team_id: '' });
+const backlogForm = reactive({ project_name: '', title: '', description: '', team_id: '', assigned_user_id: '' });
 const filters = reactive({ date: '', member_id: '', status: '' });
 const managerFilters = reactive({ date: '', status: '' });
 const historyFilters = reactive({ date: '' });
@@ -28,6 +28,7 @@ const managerDashboard = ref([]);
 const tasks = ref([]);
 const taskHistory = ref([]);
 const backlogs = ref([]);
+const myBacklogs = ref([]);
 const backlogTeams = ref([]);
 
 const statusOptions = [
@@ -116,6 +117,7 @@ async function logout() {
     tasks.value = [];
     taskHistory.value = [];
     backlogs.value = [];
+    myBacklogs.value = [];
     backlogTeams.value = [];
 }
 
@@ -315,6 +317,11 @@ async function loadBacklog() {
     backlogTeams.value = data.teams;
 }
 
+async function loadMyBacklog() {
+    const data = await request('/my-backlog');
+    myBacklogs.value = data.backlogs;
+}
+
 async function saveBacklog() {
     await request('/backlog', {
         method: 'POST',
@@ -330,6 +337,7 @@ function resetBacklogForm() {
     backlogForm.title = '';
     backlogForm.description = '';
     backlogForm.team_id = '';
+    backlogForm.assigned_user_id = '';
 }
 
 async function deleteBacklog(backlog) {
@@ -343,7 +351,11 @@ async function deleteBacklog(backlog) {
 async function moveBacklogToToday(backlog) {
     await request(`/backlog/${backlog.id}/move`, { method: 'POST' });
     message.value = 'Backlog task moved to today.';
-    await loadBacklog();
+    if (view.value === 'my-backlog') {
+        await loadMyBacklog();
+    } else {
+        await loadBacklog();
+    }
     await loadTasks();
 }
 
@@ -370,6 +382,18 @@ function roleLabel(role) {
     if (role === 'team-manager') return 'Team manager';
     if (role === 'admin') return 'Admin';
     return 'Member';
+}
+
+const selectedBacklogTeam = computed(() => backlogTeams.value.find((team) => String(team.id) === String(backlogForm.team_id)) || null);
+const assignableBacklogMembers = computed(() => selectedBacklogTeam.value?.members || []);
+
+function onBacklogTeamChange() {
+    backlogForm.assigned_user_id = '';
+}
+
+async function showMyBacklogView() {
+    view.value = 'my-backlog';
+    await loadMyBacklog();
 }
 
 const reportFilters = reactive({
@@ -491,6 +515,7 @@ onMounted(loadSession);
                         <button v-if="isMember" :class="['tab', view === 'tasks' && 'active']" @click="view = 'tasks'; loadTasks()">Today</button>
                         <button v-if="isMember" :class="['tab', view === 'history' && 'active']" @click="view = 'history'; loadTaskHistory()">History</button>
                         <button :class="['tab', view === 'backlog' && 'active']" @click="showBacklogView()">Backlog</button>
+                        <button v-if="isMember" :class="['tab', view === 'my-backlog' && 'active']" @click="showMyBacklogView()">My Backlog</button>
                         <button v-if="isAdmin || isTeamManager" :class="['tab', view === 'reports' && 'active']" @click="showReportsView()">Reports</button>
                         <button :class="['tab', view === 'account' && 'active']" @click="view = 'account'">Account</button>
                         <button class="secondary" @click="logout">Logout</button>
@@ -945,13 +970,24 @@ onMounted(loadSession);
 
                             <label class="field">
                                 <span>Team</span>
-                                <select v-model="backlogForm.team_id" required>
+                                <select v-model="backlogForm.team_id" required @change="onBacklogTeamChange">
                                     <option value="">Select team</option>
                                     <option v-for="team in backlogTeams" :key="team.id" :value="team.id">
                                         {{ team.name }}
                                     </option>
                                 </select>
                                 <small v-if="firstError('team_id')">{{ firstError('team_id') }}</small>
+                            </label>
+
+                            <label class="field">
+                                <span>Assign to team member</span>
+                                <select v-model="backlogForm.assigned_user_id" :disabled="!backlogForm.team_id">
+                                    <option value="">Unassigned</option>
+                                    <option v-for="member in assignableBacklogMembers" :key="member.id" :value="member.id">
+                                        {{ member.name }}
+                                    </option>
+                                </select>
+                                <small v-if="firstError('assigned_user_id')">{{ firstError('assigned_user_id') }}</small>
                             </label>
 
                             <label class="field">
@@ -1023,6 +1059,49 @@ onMounted(loadSession);
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <section v-if="isMember && view === 'my-backlog'" class="space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <div>
+                            <h2 class="font-semibold text-lg text-slate-900">My Backlog</h2>
+                            <p class="text-sm text-slate-500">Tasks assigned directly to you.</p>
+                        </div>
+                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {{ myBacklogs.length }} tasks
+                        </span>
+                    </div>
+
+                    <div v-if="myBacklogs.length" class="grid gap-4 sm:grid-cols-1 xl:grid-cols-2">
+                        <article v-for="task in myBacklogs" :key="task.id" class="flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 transition-all">
+                            <div class="space-y-2">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span class="inline-flex items-center rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold uppercase text-blue-700">
+                                        {{ task.project_name }}
+                                    </span>
+                                    <span class="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                                        Team: {{ task.team?.name }}
+                                    </span>
+                                </div>
+                                <h3 class="text-base font-semibold text-slate-900">{{ task.title }}</h3>
+                                <p v-if="task.description" class="text-sm text-slate-600 whitespace-pre-wrap">{{ task.description }}</p>
+                            </div>
+
+                            <div class="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+                                <button class="primary py-1.5 px-3 text-xs flex items-center gap-1 cursor-pointer" @click="moveBacklogToToday(task)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-3.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                    </svg>
+                                    Move to Today
+                                </button>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div v-else class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+                        <h3 class="mt-2 text-sm font-semibold text-slate-900">No assigned backlog tasks</h3>
+                        <p class="mt-1 text-sm text-slate-500">Tasks assigned to you will appear here.</p>
                     </div>
                 </section>
 

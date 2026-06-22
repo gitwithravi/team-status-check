@@ -36,6 +36,11 @@ class User extends Authenticatable
         return $this->hasMany(DailyTask::class);
     }
 
+    public function assignedBacklogTasks(): HasMany
+    {
+        return $this->hasMany(BacklogTask::class, 'assigned_user_id');
+    }
+
     public function teams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class)->withTimestamps();

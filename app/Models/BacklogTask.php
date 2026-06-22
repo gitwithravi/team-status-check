@@ -12,10 +12,16 @@ class BacklogTask extends Model
         'title',
         'description',
         'team_id',
+        'assigned_user_id',
     ];
 
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
     }
 }
